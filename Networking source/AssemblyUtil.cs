@@ -6,36 +6,24 @@ using System;
 
 namespace VirtualVoid.Networking
 {
-    static class AssemblyUtil
+   public static class AssemblyUtil
     {
-        //public static List<Assembly> GetAssemblies()
-        //{
-        //    var returnAssemblies = new List<Assembly>();
-        //    var loadedAssemblies = new HashSet<string>();
-        //    var assembliesToCheck = new Queue<Assembly>();
-        //
-        //    assembliesToCheck.Enqueue(Assembly.GetExecutingAssembly());
-        //
-        //    while (assembliesToCheck.Any())
-        //    {
-        //        var assemblyToCheck = assembliesToCheck.Dequeue();
-        //
-        //        foreach (var reference in assemblyToCheck.GetReferencedAssemblies()
-        //            .Where(x => !x.Name.StartsWith("Microsoft.") && !x.Name.StartsWith("System.") && !x.Name.StartsWith("UnityEngine.")))
-        //        {
-        //
-        //            if (!loadedAssemblies.Contains(reference.FullName))
-        //            {
-        //                var assembly = Assembly.Load(reference);
-        //                assembliesToCheck.Enqueue(assembly);
-        //                loadedAssemblies.Add(reference.FullName);
-        //                returnAssemblies.Add(assembly);
-        //            }
-        //        }
-        //    }
-        //
-        //    return returnAssemblies;
-        //}
+        public static List<MethodInfo> GetAllMethodsWithAttribute(Type attribType)
+        {
+            List<MethodInfo> allMethods = new List<MethodInfo>();
+
+            foreach (Assembly assembly in GetAssemblies())
+            {
+                MethodInfo[] methods = assembly.GetTypes()
+                        .SelectMany(t => t.GetMethods())
+                        .Where(m => m.GetCustomAttributes(attribType, false).Length > 0)
+                        .ToArray();
+
+                allMethods.AddRange(methods);
+            }
+
+            return allMethods;
+        }
 
         public static List<Assembly> GetAssemblies()
         {

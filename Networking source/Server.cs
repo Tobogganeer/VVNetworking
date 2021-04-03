@@ -12,7 +12,9 @@ namespace VirtualVoid.Networking.Server
     {
         public int MaxClients { get; private set; }
         public int Port { get; private set; }
+        private string Password;
         public bool started { get; private set; } = false;
+        public bool stopping { get; private set; } = false;
 
         public event Action OnServerStart;
         public event Action<int> OnClientConnected;
@@ -22,13 +24,21 @@ namespace VirtualVoid.Networking.Server
 
         public Dictionary<int, ServerClient> clients = new Dictionary<int, ServerClient>();
         public delegate void PacketHandler(int _fromClient, Packet _packet);
-        private Dictionary<string, PacketHandler> packetHandlers;
+        private Dictionary<PacketID, VerifiedPacketHandler> packetHandlers;
+        private Dictionary<string, VerifiedPacketHandler> packetHandlers_string = new Dictionary<string, VerifiedPacketHandler>();
+        private Dictionary<short, VerifiedPacketHandler> packetHandlers_short = new Dictionary<short, VerifiedPacketHandler>();
+
+        private Dictionary<PacketID, VerifiedPacketHandler> defaultPacketHandlers;
+        private Dictionary<string, VerifiedPacketHandler> defaultPacketHandlers_string = new Dictionary<string, VerifiedPacketHandler>();
+        private Dictionary<short, VerifiedPacketHandler> defaultPacketHandlers_short = new Dictionary<short, VerifiedPacketHandler>();
 
         private TcpListener tcpListener;
         private UdpClient udpListener;
 
         public delegate bool ClientsCanConnect();
         protected ClientsCanConnect clientsCanConnect = delegate { return true; };
+
+        public bool showIncomingClientIPInLogs = false;
 
         //NATUPNPLib.UPnPNATClass upnpnat = new NATUPNPLib.UPnPNATClass();
         //NATUPNPLib.IStaticPortMappingCollection mappings;
@@ -40,52 +50,81 @@ namespace VirtualVoid.Networking.Server
         /// <param name="maxClients">The maximum clients allowed to be connected at one time.</param>
         /// <param name="port">The port the server will listen on.</param>
         /// <param name="packetHandlers">The methods that will be called when a packet is received. The string is the ID of the packet.</param>
-        public Server(int maxClients, int port, Dictionary<string, PacketHandler> packetHandlers)
+        public Server(int maxClients, int port, Dictionary<PacketID, VerifiedPacketHandler> packetHandlers, string password = "")
         {
             MaxClients = maxClients;
             Port = port;
             this.packetHandlers = packetHandlers;
+            Password = password;
+
+            Debug.Log("Collecting default server packet handlers...");
+            CollectDefaultPacketHandlers();
 
             Debug.Log("Collecting server packet handlers using reflection...");
-            CollectPacketHandlers();
+            CollectReflectionPacketHandlers();
+
+            Debug.Log("Filling specific server packet handlers...");
+            FillSpecificPacketHandlers();
         }
 
-        private void CollectPacketHandlers()
+        private void CollectDefaultPacketHandlers()
         {
-            foreach (Assembly assembly in AssemblyUtil.GetAssemblies())
+            defaultPacketHandlers = new Dictionary<PacketID, VerifiedPacketHandler>()//new PacketIDEqualityComparer())
             {
-                //Assembly assembly = NetworkManager.instance.anyComponent.GetType().Assembly;
+                { NetworkManager.DEFAULT_CLIENT_WELCOME_RECEIVED, new VerifiedPacketHandler(PacketVerification.STRINGS, WelcomeReceived) },
+                { NetworkManager.DEFAULT_CLIENT_MESSAGE, new VerifiedPacketHandler(PacketVerification.HASH, MessageReceived) },
+                { NetworkManager.DEFAULT_CLIENT_RESEND_NETWORKENTITY, new VerifiedPacketHandler(PacketVerification.HASH, ResendNetworkEntity) },
+            };
+        }
 
-                MethodInfo[] methods = assembly.GetTypes()
-                        .SelectMany(t => t.GetMethods())
-                        .Where(m => m.GetCustomAttributes(typeof(ServerReceiveAttribute), false).Length > 0)
-                        .ToArray();
+        private void CollectReflectionPacketHandlers()
+        {
 
-                foreach (MethodInfo methodInfo in methods)
+            foreach (MethodInfo methodInfo in AssemblyUtil.GetAllMethodsWithAttribute(typeof(ServerReceiveAttribute)))
+            {
+                if (!methodInfo.IsStatic)
                 {
-                    if (!methodInfo.IsStatic)
+                    Debug.Log($"Client receive method {methodInfo.Name} is not static!");
+                }
+                else
+                {
+                    if (methodInfo.GetParameters().Length != 1 || methodInfo.GetParameters()[0].ParameterType != typeof(Packet))
                     {
-                        Debug.Log($"Client receive method {methodInfo.Name} is not static!");
+                        Debug.Log($"Client receive method {methodInfo.Name} must have Packet as the first and only parameter!");
                     }
                     else
                     {
-                        if (methodInfo.GetParameters().Length != 1 || methodInfo.GetParameters()[0].ParameterType != typeof(Packet))
-                        {
-                            Debug.Log($"Client receive method {methodInfo.Name} must have Packet as the first and only parameter!");
-                        }
-                        else
-                        {
-                            PacketHandler handler = (PacketHandler)methodInfo.CreateDelegate(typeof(PacketHandler));
-                            ServerReceiveAttribute attrib = methodInfo.GetCustomAttribute<ServerReceiveAttribute>();
-                            if (!packetHandlers.ContainsKey(attrib.PacketID)) packetHandlers.Add(attrib.PacketID, handler);
-                        }
+                        PacketHandler handler = (PacketHandler)methodInfo.CreateDelegate(typeof(PacketHandler));
+                        ServerReceiveAttribute attrib = methodInfo.GetCustomAttribute<ServerReceiveAttribute>();
+                        if (!packetHandlers.ContainsKey(attrib.PacketID)) packetHandlers.Add(attrib.PacketID, new VerifiedPacketHandler(attrib.ExpectedVerification, handler));
                     }
                 }
+            }
 
-                foreach (string packetID in packetHandlers.Keys)
-                {
-                    Debug.Log("Collected packet handler " + packetID);
-                }
+            foreach (string packetID in packetHandlers.Keys)
+            {
+                Debug.Log("Collected packet handler " + packetID);
+            }
+        }
+
+        private void FillSpecificPacketHandlers()
+        {
+            packetHandlers_string.Clear();
+            packetHandlers_short.Clear();
+
+            foreach (PacketID key in packetHandlers.Keys)
+            {
+                if (key.short_ID != -1) packetHandlers_short.Add(key.short_ID, packetHandlers[key]);
+                if (key.string_ID != "") packetHandlers_string.Add(key.string_ID, packetHandlers[key]);
+            }
+
+            defaultPacketHandlers_string.Clear();
+            defaultPacketHandlers_short.Clear();
+
+            foreach (PacketID key in defaultPacketHandlers.Keys)
+            {
+                if (key.short_ID != -1) defaultPacketHandlers_short.Add(key.short_ID, defaultPacketHandlers[key]);
+                if (key.string_ID != "") defaultPacketHandlers_string.Add(key.string_ID, defaultPacketHandlers[key]);
             }
         }
 
@@ -108,6 +147,7 @@ namespace VirtualVoid.Networking.Server
 
             Debug.Log($"Server started on {Port}");
             started = true;
+            stopping = false;
 
             ServerStart();
         }
@@ -132,11 +172,13 @@ namespace VirtualVoid.Networking.Server
             TcpClient _client = tcpListener.EndAcceptTcpClient(_result);
             //_client.Client.DualMode = true; // cant set family here
             tcpListener.BeginAcceptTcpClient(new AsyncCallback(TCPConnectCallback), null);
-            Debug.Log($"Incoming connection from {_client.Client.RemoteEndPoint}...");
+            if (showIncomingClientIPInLogs) Debug.Log($"Incoming connection from {_client.Client.RemoteEndPoint}...");
+            else Debug.Log("Incoming connection from {IP Hidden}...");
 
             if (!clientsCanConnect())
             {
-                Debug.Log($"{_client.Client.RemoteEndPoint} failed to connect: CanConnectToServer() returned false.");
+                if (showIncomingClientIPInLogs) Debug.Log($"{_client.Client.RemoteEndPoint} failed to connect: CanConnectToServer() returned false.");
+                else Debug.Log("{IP Hidden} failed to connect: CanConnectToServer() returned false.");
             }
 
             for (int i = 1; i <= MaxClients; i++)
@@ -148,7 +190,8 @@ namespace VirtualVoid.Networking.Server
                 }
             }
 
-            Debug.Log($"{_client.Client.RemoteEndPoint} failed to connect: Server full");
+            if (showIncomingClientIPInLogs) Debug.Log($"{_client.Client.RemoteEndPoint} failed to connect: Server full");
+            else Debug.Log("{IP Hidden} failed to connect: Server full");
         }
 
         private void UDPReceiveCallback(IAsyncResult _result)
@@ -187,8 +230,11 @@ namespace VirtualVoid.Networking.Server
             }
             catch (Exception _ex)
             {
-                Debug.Log($"Error receiving UDP data: {_ex}");
-                Debug.Log("^^^ This will happen every time you close the server.");
+                if (!stopping)
+                {
+                    Debug.Log($"Error receiving UDP data: {_ex}");
+                    Debug.Log("^^^ This will happen every time you close the server.");
+                }
             }
         }
 
@@ -203,50 +249,100 @@ namespace VirtualVoid.Networking.Server
             }
             catch (Exception _ex)
             {
-                Debug.Log($"Error sending data to {_clientEndPoint} via UDP: {_ex}");
+                if (showIncomingClientIPInLogs) Debug.Log($"Error sending data to {_clientEndPoint} via UDP: {_ex}");
+                else Debug.Log("Error sending data to {IP Hidden} via UDP: " + _ex);
             }
         }
 
-        public void HandleData(int _fromClient, string _packetID, Packet _packet)
+        public void HandleData(int _fromClient, PacketID _packetID, Packet _packet)
         {
-            string app_id = _packet.ReadString();
-            string version = _packet.ReadString();
-
-            if (app_id != NetworkManager.instance.APPLICATION_ID || version != NetworkManager.instance.VERSION)
+            if (TryGetPacketHandler(_packetID, out VerifiedPacketHandler handler))
             {
-                if (app_id != NetworkManager.instance.APPLICATION_ID)
+                if (!clients[_fromClient].joinedWithCorrectPassword && _packetID != NetworkManager.DEFAULT_CLIENT_WELCOME_RECEIVED)
                 {
-                    Debug.Log($"Packet (ID: {_packetID}) received from client (ID: {_fromClient}) with invalid APPLICATION_ID! Discarding and disconnecting client...");
-                    clients[_fromClient].Disconnect("INCORRECT_APP");
+                    Debug.Log($"Client {_fromClient} sent message with ID {_packetID} without verifying password first!");
                     return;
                 }
-                if (version == NetworkManager.instance.VERSION)
-                {
-                    Debug.Log($"Packet (ID: {_packetID}) received from client (ID: {_fromClient}) with invalid VERSION! Discarding and disconnecting client...");
-                    clients[_fromClient].Disconnect("INCORRECT_VERSION");
-                    return;
-                }
+
+                if (VerifyPacket(_packet, handler.expectedVerification, _packetID, _fromClient))
+                    handler.packetHandler(_fromClient, _packet);
             }
 
-            if (_packetID == NetworkManager.DEFAULT_CLIENT_WELCOME_RECEIVED)
+            else Debug.LogError($"Error receiving data from client {_fromClient}: PacketHandlers does not contain key {_packetID}!");
+        }
+
+        private bool TryGetPacketHandler(PacketID id, out VerifiedPacketHandler handler)
+        {
+            switch (NetworkManager.instance.packetIDType)
             {
-                WelcomeReceived(_fromClient, _packet);
-            }
-            else if (_packetID == NetworkManager.DEFAULT_CLIENT_MESSAGE)
-            {
-                MessageReceived(_fromClient, _packet);
-            }
-            else if (_packetID == NetworkManager.DEFAULT_CLIENT_RESEND_NETWORKENTITY)
-            {
-                ResendNetworkEntity(_packet.ReadInt(), _fromClient);
+                case PacketIDType.STRING:
+                    if (defaultPacketHandlers_string.TryGetValue(id.string_ID, out handler)) return true;
+                    else if (packetHandlers_string.TryGetValue(id.string_ID, out handler)) return true;
+                    return false;
+                case PacketIDType.SHORT:
+                    if (defaultPacketHandlers_short.TryGetValue(id.short_ID, out handler)) return true;
+                    else if (packetHandlers_short.TryGetValue(id.short_ID, out handler)) return true;
+                    return false;
             }
 
-            else if (packetHandlers.ContainsKey(_packetID))
+            handler = new VerifiedPacketHandler();
+            return false;
+        }
+
+        private bool VerifyPacket(Packet _packet, PacketVerification expectedVerification, PacketID packetIDforDebug, int clientIDforDebug)
+        {
+            PacketVerification verification = (PacketVerification)_packet.ReadByte();
+
+            if (verification != expectedVerification)
             {
-                packetHandlers[_packetID](_fromClient, _packet);
+                Debug.LogError($"Packet ({packetIDforDebug}, from client: {clientIDforDebug}) verification did not match the expected verification! Discarding...");
+                return false;
             }
-            else
-                Debug.LogError($"Error receiving data from client {_fromClient}: PacketHandlers does not contain key {_packetID}!");
+
+            switch (verification)
+            {
+                case PacketVerification.NONE:
+                    return true;
+
+                case PacketVerification.STRINGS:
+                    string app_id = _packet.ReadString();
+                    string version = _packet.ReadString();
+                    if (app_id != NetworkManager.instance.APPLICATION_ID || version != NetworkManager.instance.VERSION)
+                    {
+                        if (app_id != NetworkManager.instance.APPLICATION_ID)
+                        {
+                            Debug.Log($"Packet ({packetIDforDebug}) received from client {clientIDforDebug} with invalid APPLICATION_ID! Discarding...");
+                            return false;
+                        }
+                        if (version == NetworkManager.instance.VERSION)
+                        {
+                            Debug.Log($"Packet ({packetIDforDebug}) received from client {clientIDforDebug} with invalid VERSION! Discarding...");
+                            return false;
+                        }
+                    }
+                    return true;
+
+                case PacketVerification.HASH:
+                    int app_idHash = _packet.ReadInt();
+                    int versionHash = _packet.ReadInt();
+                    if (app_idHash != NetworkManager.instance.APPLICATION_ID.GetHashCode() || versionHash != NetworkManager.instance.VERSION.GetHashCode())
+                    {
+                        if (app_idHash != NetworkManager.instance.APPLICATION_ID.GetHashCode())
+                        {
+                            Debug.Log($"Packet ({packetIDforDebug}) received from client {clientIDforDebug} with invalid APPLICATION_ID hash! Discarding...");
+                            return false;
+                        }
+                        if (versionHash != NetworkManager.instance.VERSION.GetHashCode())
+                        {
+                            Debug.Log($"Packet ({packetIDforDebug}) received from client {clientIDforDebug} with invalid VERSION hash! Discarding...");
+                            return false;
+                        }
+                    }
+                    return true;
+
+                default:
+                    return true;
+            }
         }
 
         private void InitializeServerClients()
@@ -262,6 +358,7 @@ namespace VirtualVoid.Networking.Server
         /// </summary>
         public void Stop()
         {
+            stopping = true;
             tcpListener.Stop();
             udpListener.Close();
 
@@ -330,17 +427,28 @@ namespace VirtualVoid.Networking.Server
         private void WelcomeReceived(int _fromClient, Packet _packet)
         {
             int clientIdCheck = _packet.ReadInt();
+            bool passwordIsEmpty = _packet.ReadBool();
+            string clientPass = passwordIsEmpty ? "" : _packet.ReadString();
 
-            Debug.Log($"Client {_fromClient} has connected.");
-
-            if (_fromClient != clientIdCheck)
+            if (clientPass == Password)
             {
-                Debug.Log($"Client (ID: {_fromClient}) has assumed the wrong client ID! ({clientIdCheck}). Disconnecting...");
-                clients[_fromClient].Disconnect("FALSE_ID_ASSUMPTION");
-                return;
-            }
+                Debug.Log($"Client {_fromClient} has connected.");
 
-            ClientConnected(_fromClient);
+                if (_fromClient != clientIdCheck)
+                {
+                    Debug.Log($"Client (ID: {_fromClient}) has assumed the wrong client ID! ({clientIdCheck}). Disconnecting...");
+                    clients[_fromClient].Disconnect("FALSE_ID_ASSUMPTION");
+                    return;
+                }
+
+                clients[_fromClient].joinedWithCorrectPassword = true;
+                ClientConnected(_fromClient);
+            }
+            else
+            {
+                Debug.Log($"Client {_fromClient} tried to join with incorrect password!");
+                clients[_fromClient].Disconnect("WRONG_PASSWORD");
+            }
         }
 
         private void MessageReceived(int _fromClient, Packet _packet)
@@ -373,7 +481,7 @@ namespace VirtualVoid.Networking.Server
 
         public void SpawnNetworkEntity(ServerNetworkEntity networkEntity)
         {
-            using (Packet _packet = new Packet(NetworkManager.DEFAULT_SERVER_SPAWN_NETWORKENTITY))
+            using (Packet _packet = new Packet(NetworkManager.DEFAULT_SERVER_SPAWN_NETWORKENTITY, PacketVerification.HASH))
             {
                 _packet.Write(networkEntity.id);
                 _packet.Write(networkEntity.entityType);
@@ -387,7 +495,7 @@ namespace VirtualVoid.Networking.Server
 
         public void TransformNetworkEntity(ServerNetworkEntity networkEntity)
         {
-            using (Packet _packet = new Packet(NetworkManager.DEFAULT_SERVER_TRANSFORM_NETWORKENTITY))
+            using (Packet _packet = new Packet(NetworkManager.DEFAULT_SERVER_TRANSFORM_NETWORKENTITY, PacketVerification.NONE))
             {
                 _packet.Write(networkEntity.id);
                 _packet.Write(networkEntity.transform.position);
@@ -399,7 +507,7 @@ namespace VirtualVoid.Networking.Server
 
         public void DestroyNetworkEntity(ServerNetworkEntity networkEntity)
         {
-            using (Packet _packet = new Packet(NetworkManager.DEFAULT_SERVER_DESTROY_NETWORKENTITY))
+            using (Packet _packet = new Packet(NetworkManager.DEFAULT_SERVER_DESTROY_NETWORKENTITY, PacketVerification.HASH))
             {
                 _packet.Write(networkEntity.id);
 
@@ -407,10 +515,12 @@ namespace VirtualVoid.Networking.Server
             }
         }
 
-        public void ResendNetworkEntity(int _entityId, int _playerId)
+        public void ResendNetworkEntity(int _fromClient, Packet _clientPacket)
         {
-            using (Packet _packet = new Packet(NetworkManager.DEFAULT_SERVER_SPAWN_NETWORKENTITY))
+            using (Packet _packet = new Packet(NetworkManager.DEFAULT_SERVER_SPAWN_NETWORKENTITY, PacketVerification.HASH))
             {
+                int _entityId = _clientPacket.ReadInt();
+
                 if (ServerNetworkEntity.entities.ContainsKey(_entityId))
                 {
                     ServerNetworkEntity networkEntity = ServerNetworkEntity.entities[_entityId];
@@ -421,7 +531,7 @@ namespace VirtualVoid.Networking.Server
                     _packet.Write(networkEntity.transform.rotation);
                     _packet.Write(networkEntity.transform.localScale);
 
-                    SendTCPData(_playerId, _packet);
+                    SendTCPData(_fromClient, _packet);
                 }
                 else
                 {
@@ -463,6 +573,18 @@ namespace VirtualVoid.Networking.Server
                 }
             }
             throw new Exception("No network adapters with an IPv4 address in the system!");
+        }
+    }
+
+    public struct VerifiedPacketHandler
+    {
+        public PacketVerification expectedVerification;
+        public Server.PacketHandler packetHandler;
+
+        public VerifiedPacketHandler(PacketVerification expectedVerification, Server.PacketHandler packetHandler)
+        {
+            this.expectedVerification = expectedVerification;
+            this.packetHandler = packetHandler;
         }
     }
 }

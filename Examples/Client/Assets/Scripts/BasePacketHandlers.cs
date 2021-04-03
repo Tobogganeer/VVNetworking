@@ -7,7 +7,7 @@ public class BasePacketHandlers
 {
     static GameObject cube;
 
-    [ClientReceive("SPAWN_CUBE")]
+    [ClientReceive(1, PacketVerification.HASH)]
     public static void SpawnCube(Packet _packet)
     {
         Vector3 colour = _packet.ReadVector3();
@@ -15,7 +15,7 @@ public class BasePacketHandlers
         cube.GetComponent<MeshRenderer>().material.color = new Color(colour.x / 255f, colour.y / 255f, colour.z / 255f);
     }
 
-    [ClientReceive("ROTATE_CUBE")]
+    [ClientReceive(2, PacketVerification.NONE)]
     public static void RotateCube(Packet _packet)
     {
         Quaternion rotation = _packet.ReadQuaternion();

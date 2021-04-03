@@ -157,6 +157,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   ip: 127.0.0.1
   port: 26950
+  serverPassword: testPass
   autoConnectOnAppStart: 1
   logMessagesFromServer: 1
 --- !u!114 &406545156
@@ -187,6 +188,7 @@ MonoBehaviour:
   VERSION: 1.0
   encryptionType: 0
   encryptionKey: 
+  packetIDType: 1
 --- !u!4 &406545158
 Transform:
   m_ObjectHideFlags: 0

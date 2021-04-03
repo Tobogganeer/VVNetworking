@@ -16,6 +16,8 @@ namespace VirtualVoid.Networking.Server
 
         public bool isConnected;
 
+        public bool joinedWithCorrectPassword { get; set; } = false;
+
         public ServerClient(int _clientId, Server server)
         {
             id = _clientId;
@@ -121,7 +123,7 @@ namespace VirtualVoid.Networking.Server
                         using (Packet _packet = new Packet(_packetBytes))
                         {
                             _packet.Decrypt(NetworkManager.instance.encryptionType, NetworkManager.instance.encryptionKey);
-                            string _packetId = _packet.ReadString();
+                            PacketID _packetId = NetworkManager.instance.packetIDType == PacketIDType.STRING ? new PacketID(_packet.ReadString()) : new PacketID(_packet.ReadShort());
                             client.HandleData(_packetId, _packet);
                         }
                     });
@@ -189,7 +191,7 @@ namespace VirtualVoid.Networking.Server
                     using (Packet _newPacket = new Packet(_packetBytes))
                     {
                         _newPacket.Decrypt(NetworkManager.instance.encryptionType, NetworkManager.instance.encryptionKey);
-                        string _packetId = _newPacket.ReadString();
+                        PacketID _packetId = NetworkManager.instance.packetIDType == PacketIDType.STRING ? new PacketID(_packet.ReadString()) : new PacketID(_packet.ReadShort());
                         client.HandleData(_packetId, _newPacket);
                     }
                 });
@@ -203,6 +205,7 @@ namespace VirtualVoid.Networking.Server
 
         public void Disconnect(string reason)
         {
+            joinedWithCorrectPassword = false;
             isConnected = false;
             if (tcp.socket != null)
             {
@@ -216,7 +219,7 @@ namespace VirtualVoid.Networking.Server
             server.ClientDisconnected(id);
         }
 
-        private void HandleData(string _packetId, Packet _packet)
+        private void HandleData(PacketID _packetId, Packet _packet)
         {
             server.HandleData(id, _packetId, _packet);
         }
@@ -235,7 +238,7 @@ namespace VirtualVoid.Networking.Server
 
         private void Welcome()
         {
-            using (Packet _packet = new Packet(NetworkManager.DEFAULT_SERVER_WELCOME_ID))
+            using (Packet _packet = new Packet(NetworkManager.DEFAULT_SERVER_WELCOME_ID, PacketVerification.STRINGS))
             {
                 _packet.Write(id);
 
@@ -245,7 +248,7 @@ namespace VirtualVoid.Networking.Server
 
         private void DisconnectClient(string reason)
         {
-            using (Packet _packet = new Packet(NetworkManager.DEFAULT_SERVER_DISCONNECT_ID))
+            using (Packet _packet = new Packet(NetworkManager.DEFAULT_SERVER_DISCONNECT_ID, PacketVerification.STRINGS))
             {
                 _packet.Write(reason);
 
@@ -255,7 +258,7 @@ namespace VirtualVoid.Networking.Server
 
         public void SendMessage(string message)
         {
-            using (Packet _packet = new Packet(NetworkManager.DEFAULT_SERVER_MESSAGE))
+            using (Packet _packet = new Packet(NetworkManager.DEFAULT_SERVER_MESSAGE, PacketVerification.HASH))
             {
                 _packet.Write(message);
 

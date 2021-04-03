@@ -16,7 +16,7 @@ public class CubeSpawner : MonoBehaviour
 
     private void SpawnCube(int _client)
     {
-        using (Packet _packet = new Packet("SPAWN_CUBE"))
+        using (Packet _packet = new Packet(1, PacketVerification.HASH))
         {
             _packet.Write(colour);
             server.server.SendTCPData(_client, _packet);
@@ -31,7 +31,7 @@ public class CubeSpawner : MonoBehaviour
 
         transform.Rotate(new Vector3(5, 10, 7));
 
-        using (Packet _packet = new Packet("ROTATE_CUBE"))
+        using (Packet _packet = new Packet(2, PacketVerification.NONE))
         {
             _packet.Write(transform.rotation);
             server.server.SendTCPData(1, _packet);

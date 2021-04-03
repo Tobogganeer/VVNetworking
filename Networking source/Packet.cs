@@ -5,6 +5,132 @@ using UnityEngine;
 
 namespace VirtualVoid.Networking
 {
+    public enum PacketVerification
+    {
+        NONE = 0,
+        STRINGS = 1,
+        HASH = 2
+    }
+
+    public enum PacketIDType
+    {
+        STRING,
+        SHORT
+    }
+
+    public struct PacketID// : IEquatable<PacketID>
+    {
+        public string string_ID;
+        public short short_ID;
+
+        public PacketID(string string_ID)
+        {
+            this.string_ID = string_ID;
+            this.short_ID = -1;
+        }
+
+        public PacketID(short short_ID)
+        {
+            this.string_ID = "";
+            this.short_ID = short_ID;
+        }
+
+        public PacketID(string string_ID, short short_ID)
+        {
+            this.string_ID = string_ID;
+            this.short_ID = short_ID;
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (obj is PacketID id)
+            {
+                return IsSameAs(id);
+            }
+            return false;
+        }
+
+        public bool Equals(PacketID other)
+        {
+            return IsSameAs(other);
+        }
+
+        private bool IsSameAs(PacketID id)
+        {
+            if (id.string_ID == "" || this.string_ID == "")
+            {
+                return id.short_ID == this.short_ID;
+            }
+            else if (id.short_ID == -1 || this.short_ID == -1)
+            {
+                return id.string_ID == this.string_ID;
+            }
+            else
+            {
+                return id.short_ID == this.short_ID &&
+                    id.string_ID == this.string_ID;
+            }
+        }
+
+        public override int GetHashCode()
+        {
+            int hashCode = 80902019;
+            hashCode = hashCode * -1521134295 + EqualityComparer<string>.Default.GetHashCode(string_ID);
+            hashCode = hashCode * -1521134295 + short_ID.GetHashCode();
+            return hashCode;
+        }
+
+        public override string ToString()
+        {
+            return $"STRING_ID: {string_ID} - SHORT_ID: {short_ID}";
+        }
+
+
+        public static bool operator ==(PacketID id1, PacketID id2)
+        {
+            return id1.Equals(id2);
+        }
+
+        public static bool operator !=(PacketID id1, PacketID id2)
+        {
+            return !id1.Equals(id2);
+        }
+
+
+        public static explicit operator string(PacketID id)
+        {
+            return id.string_ID;
+        }
+
+        public static explicit operator short(PacketID id)
+        {
+            return id.short_ID;
+        }
+
+        public static implicit operator PacketID(string id)
+        {
+            return new PacketID(id);
+        }
+
+        public static implicit operator PacketID(short id)
+        {
+            return new PacketID(id);
+        }
+    }
+
+    //public class PacketIDEqualityComparer : IEqualityComparer<PacketID>
+    //{
+    //    public bool Equals(PacketID x, PacketID y)
+    //    {
+    //        return x.Equals(y);
+    //    }
+    //
+    //    public int GetHashCode(PacketID obj)
+    //    {
+    //        return obj.GetHashCode();
+    //    }
+    //}
+
     public class Packet : IDisposable
     {
         private List<byte> buffer;
@@ -20,16 +146,18 @@ namespace VirtualVoid.Networking
 
         /// <summary>Creates a new packet with a given ID. Used for sending.</summary>
         /// <param name="_id">The packet ID.</param>
-        public Packet(string _id)
+        public Packet(PacketID _id, PacketVerification verification)
         {
             //if (NetworkManager.GetDefaultPacketIDs().Contains()) // Doesn't work, default packets are made this way too :P
 
             buffer = new List<byte>(); // Intitialize buffer
             readPos = 0; // Set readPos to 0
 
-            Write(_id); // Write packet id to the buffer
-            Write(NetworkManager.instance.APPLICATION_ID);
-            Write(NetworkManager.instance.VERSION);
+            if (!LegalPacketID(_id, NetworkManager.instance.packetIDType)) throw new InvalidOperationException("Invalid packet ID for set PacketIDType!");
+
+            if (NetworkManager.instance.packetIDType == PacketIDType.SHORT) Write(_id.short_ID); // Write packet id to the buffer
+            else Write(_id.string_ID);
+            PackVerification(verification);
         }
 
         /// <summary>Creates a packet from which data can be read. Used for receiving.</summary>
@@ -40,6 +168,40 @@ namespace VirtualVoid.Networking
             readPos = 0; // Set readPos to 0
 
             SetBytes(_data);
+        }
+
+        private bool LegalPacketID(PacketID _id, PacketIDType _packetIDType)
+        {
+            if (_packetIDType == PacketIDType.SHORT && _id.short_ID == -1)
+            {
+                Debug.LogError($"Packet with string ID ({_id.string_ID}) has short ID of -1 despite NetworkManager.packetIDType being set to PacketIDType.SHORT!");
+                return false;
+            }
+            else if (_packetIDType == PacketIDType.STRING && _id.string_ID == "")
+            {
+                Debug.LogError($"Packet with short ID ({_id.short_ID}) has string ID of null despite NetworkManager.packetIDType being set to PacketIDType.STRING!");
+                return false;
+            }
+            return true;
+        }
+
+        private void PackVerification(PacketVerification verification)
+        {
+            Write((byte)verification);
+
+            switch (verification)
+            {
+                case PacketVerification.NONE:
+                    break;
+                case PacketVerification.STRINGS:
+                    Write(NetworkManager.instance.APPLICATION_ID);
+                    Write(NetworkManager.instance.VERSION);
+                    break;
+                case PacketVerification.HASH:
+                    Write(NetworkManager.instance.APPLICATION_ID.GetHashCode());
+                    Write(NetworkManager.instance.VERSION.GetHashCode());
+                    break;
+            }
         }
 
         #region Functions

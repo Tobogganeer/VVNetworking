@@ -12,6 +12,7 @@ namespace VirtualVoid.Networking.Client
         [Header("This is just a simple MonoBehaviour front for the Client class, you can use this one or make one yourself.")]
         public string ip;
         public int port;
+        public string serverPassword = "";
         public bool autoConnectOnAppStart;
 
         [Header("If enabled, all messages received from the server via the built in SendMessage function will be logged.")]
@@ -40,7 +41,7 @@ namespace VirtualVoid.Networking.Client
                 //if (handler != null)
                 //{
                 //  client = new Client(ip, port, handler.CollectPacketHandlers());
-                client = new Client(ip, port, new System.Collections.Generic.Dictionary<string, Client.PacketHandler>());
+                client = new Client(ip, port, new System.Collections.Generic.Dictionary<PacketID, VerifiedPacketHandler>(/*new PacketIDEqualityComparer()*/));
                 client.OnConnectedToServer += ClientConnectedToServer;
                 client.OnDisconnectedFromServer += ClientDisconnectedFromServer;
                 client.OnReceiveMessageFromServer += ReceiveMessageFromServer;
@@ -54,8 +55,7 @@ namespace VirtualVoid.Networking.Client
 
             if (!client.isConnected)
             {
-                
-                client.ConnectToServer();
+                client.ConnectToServer(serverPassword);
             }
         }
 

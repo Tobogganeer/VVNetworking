@@ -579,9 +579,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   maxClients: 8
   port: 26950
+  password: testPass
   autoRunOnAppStart: 1
   logMessagesFromClients: 1
   clientsCanJoin: 1
+  showIncomingClientIPInLogs: 0
 --- !u!114 &1539301273
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -610,6 +612,7 @@ MonoBehaviour:
   VERSION: 1.0
   encryptionType: 0
   encryptionKey: 
+  packetIDType: 1
 --- !u!4 &1539301275
 Transform:
   m_ObjectHideFlags: 0

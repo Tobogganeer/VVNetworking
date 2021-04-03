@@ -12,6 +12,7 @@ namespace VirtualVoid.Networking.Server
         [Header("This is just a simple MonoBehaviour front for the Server class, you can use this one or make one yourself.")]
         public int maxClients;
         public int port;
+        public string password = "";
         public bool autoRunOnAppStart;
 
         [Header("If enabled, all messages received from clients via the built in SendMessage function will be logged.")]
@@ -25,6 +26,9 @@ namespace VirtualVoid.Networking.Server
         public event Action<int> OnClientDisconnected;
         public event Action OnServerClose;
         public event Action<int, string> OnReceiveMessageFromClient;
+
+        [Header("If true, the IP of clients attempting to connect will be shown in the Debug logs.")]
+        public bool showIncomingClientIPInLogs = false;
 
         public void Start()
         {
@@ -44,7 +48,7 @@ namespace VirtualVoid.Networking.Server
                 //if (handler != null)
                 //{
                 //server = new Server(maxClients, port, handler.CollectPacketHandlers());
-                server = new Server(maxClients, port, new System.Collections.Generic.Dictionary<string, Server.PacketHandler>());
+                server = new Server(maxClients, port, new System.Collections.Generic.Dictionary<PacketID, VerifiedPacketHandler>(/*new PacketIDEqualityComparer()*/), password);
                 server.SetClientsCanJoin(delegate { return clientsCanJoin; });
                 server.OnServerStart += ServerStart;
                 server.OnClientConnected += ClientConnected;
@@ -61,6 +65,7 @@ namespace VirtualVoid.Networking.Server
 
             if (!server.started)
             {
+                server.showIncomingClientIPInLogs = showIncomingClientIPInLogs;
                 server.StartServer();
             }
         }
@@ -127,17 +132,17 @@ namespace VirtualVoid.Networking.Server
         #region NetworkEntities
         public void SpawnNetworkEntity(ServerNetworkEntity networkEntity)
         {
-            server.SpawnNetworkEntity(networkEntity);
+            server?.SpawnNetworkEntity(networkEntity);
         }
 
         public void TransformNetworkEntity(ServerNetworkEntity networkEntity)
         {
-            server.TransformNetworkEntity(networkEntity);
+            server?.TransformNetworkEntity(networkEntity);
         }
 
         public void DestroyNetworkEntity(ServerNetworkEntity networkEntity)
         {
-            server.DestroyNetworkEntity(networkEntity);
+            server?.DestroyNetworkEntity(networkEntity);
         }
         #endregion
 
