@@ -14,6 +14,7 @@ namespace VirtualVoid.Networking.Server
         public int port;
         public string password = "";
         public bool autoRunOnAppStart;
+        public bool initializeServerOnStart = true;
 
         [Header("If enabled, all messages received from clients via the built in SendMessage function will be logged.")]
         public bool logMessagesFromClients;
@@ -34,6 +35,17 @@ namespace VirtualVoid.Networking.Server
         {
             OnReceiveMessageFromClient += LogCLientMessage;
 
+            if (initializeServerOnStart)
+            {
+                server = new Server(maxClients, port, new System.Collections.Generic.Dictionary<PacketID, VerifiedPacketHandler>(/*new PacketIDEqualityComparer()*/));
+                server.SetClientsCanJoin(delegate { return clientsCanJoin; });
+                server.OnServerStart += ServerStart;
+                server.OnClientConnected += ClientConnected;
+                server.OnClientDisconnected += ClientDisconnected;
+                server.OnServerClose += ServerClose;
+                server.OnReceiveMessageFromClient += ReceiveMessageFromClient;
+            }
+
             if (autoRunOnAppStart)
             {
                 StartServer();
@@ -48,7 +60,7 @@ namespace VirtualVoid.Networking.Server
                 //if (handler != null)
                 //{
                 //server = new Server(maxClients, port, handler.CollectPacketHandlers());
-                server = new Server(maxClients, port, new System.Collections.Generic.Dictionary<PacketID, VerifiedPacketHandler>(/*new PacketIDEqualityComparer()*/), password);
+                server = new Server(maxClients, port, new System.Collections.Generic.Dictionary<PacketID, VerifiedPacketHandler>(/*new PacketIDEqualityComparer()*/));
                 server.SetClientsCanJoin(delegate { return clientsCanJoin; });
                 server.OnServerStart += ServerStart;
                 server.OnClientConnected += ClientConnected;
@@ -66,13 +78,14 @@ namespace VirtualVoid.Networking.Server
             if (!server.started)
             {
                 server.showIncomingClientIPInLogs = showIncomingClientIPInLogs;
-                server.StartServer();
+                server.StartServer(password);
             }
         }
 
         public void StopServer()
         {
-            server?.Stop();
+            if (server != null && server.started)
+                server.Stop();
         }
 
         public void OnApplicationQuit()

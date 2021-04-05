@@ -29,12 +29,6 @@ namespace VirtualVoid.Networking
             PacketID = new PacketID(string_packetID, short_packetID);
             ExpectedVerification = expectedVerification;
         }
-
-        public ClientReceiveAttribute(PacketID packetID, PacketVerification expectedVerification = PacketVerification.NONE)
-        {
-            PacketID = packetID;
-            ExpectedVerification = expectedVerification;
-        }
     }
 
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
@@ -58,12 +52,6 @@ namespace VirtualVoid.Networking
         public ServerReceiveAttribute(string string_packetID, short short_packetID, PacketVerification expectedVerification = PacketVerification.NONE)
         {
             PacketID = new PacketID(string_packetID, short_packetID);
-            ExpectedVerification = expectedVerification;
-        }
-
-        public ServerReceiveAttribute(PacketID packetID, PacketVerification expectedVerification = PacketVerification.NONE)
-        {
-            PacketID = packetID;
             ExpectedVerification = expectedVerification;
         }
     }

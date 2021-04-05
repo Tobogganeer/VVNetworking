@@ -50,12 +50,11 @@ namespace VirtualVoid.Networking.Server
         /// <param name="maxClients">The maximum clients allowed to be connected at one time.</param>
         /// <param name="port">The port the server will listen on.</param>
         /// <param name="packetHandlers">The methods that will be called when a packet is received. The string is the ID of the packet.</param>
-        public Server(int maxClients, int port, Dictionary<PacketID, VerifiedPacketHandler> packetHandlers, string password = "")
+        public Server(int maxClients, int port, Dictionary<PacketID, VerifiedPacketHandler> packetHandlers)
         {
             MaxClients = maxClients;
             Port = port;
             this.packetHandlers = packetHandlers;
-            Password = password;
 
             Debug.Log("Collecting default server packet handlers...");
             CollectDefaultPacketHandlers();
@@ -84,13 +83,13 @@ namespace VirtualVoid.Networking.Server
             {
                 if (!methodInfo.IsStatic)
                 {
-                    Debug.Log($"Client receive method {methodInfo.Name} is not static!");
+                    Debug.Log($"Server receive method {methodInfo.Name} is not static!");
                 }
                 else
                 {
-                    if (methodInfo.GetParameters().Length != 1 || methodInfo.GetParameters()[0].ParameterType != typeof(Packet))
+                    if (methodInfo.GetParameters().Length != 2 || methodInfo.GetParameters()[0].ParameterType != typeof(int) || methodInfo.GetParameters()[0].ParameterType != typeof(Packet))
                     {
-                        Debug.Log($"Client receive method {methodInfo.Name} must have Packet as the first and only parameter!");
+                        Debug.Log($"Server receive method {methodInfo.Name} must have int as the first parameter and Packet as the second!");
                     }
                     else
                     {
@@ -128,8 +127,9 @@ namespace VirtualVoid.Networking.Server
             }
         }
 
-        public void StartServer()
+        public void StartServer(string password = "")
         {
+            this.Password = password;
             //mappings = upnpnat.StaticPortMappingCollection;
             PortForward();
             InitializeServerClients();

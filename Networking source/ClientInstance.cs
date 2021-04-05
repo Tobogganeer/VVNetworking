@@ -14,6 +14,7 @@ namespace VirtualVoid.Networking.Client
         public int port;
         public string serverPassword = "";
         public bool autoConnectOnAppStart;
+        public bool initializeClientOnAppStart = true;
 
         [Header("If enabled, all messages received from the server via the built in SendMessage function will be logged.")]
         public bool logMessagesFromServer;
@@ -26,6 +27,14 @@ namespace VirtualVoid.Networking.Client
         public void Start()
         {
             OnReceiveMessageFromServer += LogServerMessage;
+
+            if (initializeClientOnAppStart)
+            {
+                client = new Client(new System.Collections.Generic.Dictionary<PacketID, VerifiedPacketHandler>());
+                client.OnConnectedToServer += ClientConnectedToServer;
+                client.OnDisconnectedFromServer += ClientDisconnectedFromServer;
+                client.OnReceiveMessageFromServer += ReceiveMessageFromServer;
+            }
 
             if (autoConnectOnAppStart)
             {
@@ -41,7 +50,7 @@ namespace VirtualVoid.Networking.Client
                 //if (handler != null)
                 //{
                 //  client = new Client(ip, port, handler.CollectPacketHandlers());
-                client = new Client(ip, port, new System.Collections.Generic.Dictionary<PacketID, VerifiedPacketHandler>(/*new PacketIDEqualityComparer()*/));
+                client = new Client(new System.Collections.Generic.Dictionary<PacketID, VerifiedPacketHandler>(/*new PacketIDEqualityComparer()*/));
                 client.OnConnectedToServer += ClientConnectedToServer;
                 client.OnDisconnectedFromServer += ClientDisconnectedFromServer;
                 client.OnReceiveMessageFromServer += ReceiveMessageFromServer;
@@ -55,13 +64,14 @@ namespace VirtualVoid.Networking.Client
 
             if (!client.isConnected)
             {
-                client.ConnectToServer(serverPassword);
+                client.ConnectToServer(ip, port, serverPassword);
             }
         }
 
         public void Disconnect()
         {
-            client?.Disconnect();
+            if (client != null && client.isConnected)
+                client.Disconnect();
         }
 
         public void OnApplicationQuit()

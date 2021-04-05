@@ -39,11 +39,9 @@ namespace VirtualVoid.Networking.Client
         /// <param name="packetHandlers">The methods that will be called when a packet is received. The string is the ID of the packet.</param>
         /// <param name="ip">The IP address of the server.</param>
         /// <param name="port">The port that the server is listening on</param>
-        public Client(string ip, int port, Dictionary<PacketID, VerifiedPacketHandler> packetHandlers)
+        public Client(Dictionary<PacketID, VerifiedPacketHandler> packetHandlers)
         {
             this.packetHandlers = packetHandlers;
-            this.ip = ip;
-            this.port = port;
 
             Debug.Log("Collecting default client packet handlers...");
             CollectDefaultPacketHandlers();
@@ -119,11 +117,14 @@ namespace VirtualVoid.Networking.Client
             }
         }
 
-        public void ConnectToServer(string password = "")
+        public void ConnectToServer(string ip = "127.0.0.1", int port = 26950, string password = "")
         {
+            this.ip = ip;
+            this.port = port;
+            this.password = password;
+
             tcp = new TCP(this);
             udp = new UDP(this);
-            this.password = password;
 
             tcp.Connect();
         }
@@ -463,12 +464,13 @@ namespace VirtualVoid.Networking.Client
                 DisconnectedFromServer();
 
             isConnected = false;
+
             if (tcp.socket != null)
-            {
                 tcp.socket.Close();
-            }
+
             if (udp.socket != null)
                 udp.socket.Close();
+
             if (log)
                 Debug.Log("Disconnected.");
         }
