@@ -87,7 +87,7 @@ namespace VirtualVoid.Networking.Server
                 }
                 else
                 {
-                    if (methodInfo.GetParameters().Length != 2 || methodInfo.GetParameters()[0].ParameterType != typeof(int) || methodInfo.GetParameters()[0].ParameterType != typeof(Packet))
+                    if (methodInfo.GetParameters().Length != 2 || methodInfo.GetParameters()[0].ParameterType != typeof(int) || methodInfo.GetParameters()[1].ParameterType != typeof(Packet))
                     {
                         Debug.Log($"Server receive method {methodInfo.Name} must have int as the first parameter and Packet as the second!");
                     }
@@ -100,7 +100,7 @@ namespace VirtualVoid.Networking.Server
                 }
             }
 
-            foreach (string packetID in packetHandlers.Keys)
+            foreach (PacketID packetID in packetHandlers.Keys)
             {
                 Debug.Log("Collected packet handler " + packetID);
             }
@@ -347,6 +347,8 @@ namespace VirtualVoid.Networking.Server
 
         private void InitializeServerClients()
         {
+            clients.Clear();
+
             for (int i = 1; i <= MaxClients; i++)
             {
                 clients.Add(i, new ServerClient(i, this));
@@ -359,8 +361,11 @@ namespace VirtualVoid.Networking.Server
         public void Stop()
         {
             stopping = true;
+            started = false;
             tcpListener.Stop();
             udpListener.Close();
+
+            ServerClose();
 
             foreach (ServerClient client in clients.Values)
             {
@@ -368,8 +373,6 @@ namespace VirtualVoid.Networking.Server
             }
 
             UnPortForward();
-            started = false;
-            ServerClose();
         }
 
         #region Packet Sending Methods

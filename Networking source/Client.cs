@@ -90,7 +90,7 @@ namespace VirtualVoid.Networking.Client
                 }
             }
 
-            foreach (string packetID in packetHandlers.Keys)
+            foreach (PacketID packetID in packetHandlers.Keys)
             {
                 Debug.Log("Collected packet handler " + packetID);
             }

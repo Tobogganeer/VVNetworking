@@ -84,7 +84,7 @@ namespace VirtualVoid.Networking.Server
 
         public void StopServer()
         {
-            if (server != null && server.started)
+            if (server != null && server.started && !server.stopping)
                 server.Stop();
         }
 
