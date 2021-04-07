@@ -35,10 +35,9 @@ namespace VirtualVoid.Networking.Server
         private TcpListener tcpListener;
         private UdpClient udpListener;
 
-        public delegate bool ClientsCanConnect();
-        protected ClientsCanConnect clientsCanConnect = delegate { return true; };
-
         public bool showIncomingClientIPInLogs = false;
+
+        public bool clientsCanJoin = true;
 
         //NATUPNPLib.UPnPNATClass upnpnat = new NATUPNPLib.UPnPNATClass();
         //NATUPNPLib.IStaticPortMappingCollection mappings;
@@ -164,8 +163,6 @@ namespace VirtualVoid.Networking.Server
             //mappings.Remove(Port, "UDP");
         }
 
-        public void SetClientsCanJoin(ClientsCanConnect clientsCanConnect) { this.clientsCanConnect = clientsCanConnect; }
-
         private void TCPConnectCallback(IAsyncResult _result)
         {
             //TcpClient _client = new TcpClient(AddressFamily.InterNetworkV6);
@@ -175,7 +172,7 @@ namespace VirtualVoid.Networking.Server
             if (showIncomingClientIPInLogs) Debug.Log($"Incoming connection from {_client.Client.RemoteEndPoint}...");
             else Debug.Log("Incoming connection from {IP Hidden}...");
 
-            if (!clientsCanConnect())
+            if (!clientsCanJoin)
             {
                 if (showIncomingClientIPInLogs) Debug.Log($"{_client.Client.RemoteEndPoint} failed to connect: CanConnectToServer() returned false.");
                 else Debug.Log("{IP Hidden} failed to connect: CanConnectToServer() returned false.");

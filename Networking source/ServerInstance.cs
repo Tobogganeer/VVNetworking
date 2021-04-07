@@ -20,7 +20,18 @@ namespace VirtualVoid.Networking.Server
         public bool logMessagesFromClients;
 
         [Header("If false, incoming connection will be rejected.")]
-        public bool clientsCanJoin = true;
+        [SerializeField] private bool clientsCanConnect = true;
+        public bool clientsCanJoin
+        {
+            get
+            {
+                return server.clientsCanJoin;
+            }
+            set
+            {
+                server.clientsCanJoin = value;
+            }
+        }
 
         public event Action OnServerStart;
         public event Action<int> OnClientConnected;
@@ -33,12 +44,13 @@ namespace VirtualVoid.Networking.Server
 
         public void Start()
         {
+            clientsCanJoin = clientsCanConnect;
+
             OnReceiveMessageFromClient += LogCLientMessage;
 
             if (initializeServerOnStart)
             {
                 server = new Server(maxClients, port, new System.Collections.Generic.Dictionary<PacketID, VerifiedPacketHandler>(/*new PacketIDEqualityComparer()*/));
-                server.SetClientsCanJoin(delegate { return clientsCanJoin; });
                 server.OnServerStart += ServerStart;
                 server.OnClientConnected += ClientConnected;
                 server.OnClientDisconnected += ClientDisconnected;
@@ -61,7 +73,6 @@ namespace VirtualVoid.Networking.Server
                 //{
                 //server = new Server(maxClients, port, handler.CollectPacketHandlers());
                 server = new Server(maxClients, port, new System.Collections.Generic.Dictionary<PacketID, VerifiedPacketHandler>(/*new PacketIDEqualityComparer()*/));
-                server.SetClientsCanJoin(delegate { return clientsCanJoin; });
                 server.OnServerStart += ServerStart;
                 server.OnClientConnected += ClientConnected;
                 server.OnClientDisconnected += ClientDisconnected;
