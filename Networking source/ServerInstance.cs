@@ -44,8 +44,6 @@ namespace VirtualVoid.Networking.Server
 
         public void Start()
         {
-            clientsCanJoin = clientsCanConnect;
-
             OnReceiveMessageFromClient += LogCLientMessage;
 
             if (initializeServerOnStart)
@@ -56,6 +54,7 @@ namespace VirtualVoid.Networking.Server
                 server.OnClientDisconnected += ClientDisconnected;
                 server.OnServerClose += ServerClose;
                 server.OnReceiveMessageFromClient += ReceiveMessageFromClient;
+                clientsCanJoin = clientsCanConnect;
             }
 
             if (autoRunOnAppStart)
@@ -78,6 +77,7 @@ namespace VirtualVoid.Networking.Server
                 server.OnClientDisconnected += ClientDisconnected;
                 server.OnServerClose += ServerClose;
                 server.OnReceiveMessageFromClient += ReceiveMessageFromClient;
+                clientsCanJoin = clientsCanConnect;
                 //}
                 //else
                 //{
