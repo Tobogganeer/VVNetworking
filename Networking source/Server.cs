@@ -176,6 +176,7 @@ namespace VirtualVoid.Networking.Server
             {
                 if (showIncomingClientIPInLogs) Debug.Log($"{_client.Client.RemoteEndPoint} failed to connect: CanConnectToServer() returned false.");
                 else Debug.Log("{IP Hidden} failed to connect: CanConnectToServer() returned false.");
+                return;
             }
 
             for (int i = 1; i <= MaxClients; i++)
