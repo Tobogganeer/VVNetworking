@@ -356,7 +356,7 @@ namespace VirtualVoid.Networking.Server
         /// <summary>
         /// Call when you want to stop the server.
         /// </summary>
-        public void Stop()
+        public void Stop(string reason = "SERVER_SHUTDOWN")
         {
             stopping = true;
             started = false;
@@ -367,7 +367,7 @@ namespace VirtualVoid.Networking.Server
 
             foreach (ServerClient client in clients.Values)
             {
-                client.Disconnect("SERVER_SHUTDOWN");
+                client.Disconnect(reason);
             }
 
             UnPortForward();

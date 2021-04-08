@@ -93,10 +93,10 @@ namespace VirtualVoid.Networking.Server
             }
         }
 
-        public void StopServer()
+        public void StopServer(string reason = "SERVER_SHUTDOWN")
         {
             if (server != null && server.started && !server.stopping)
-                server.Stop();
+                server.Stop(reason);
         }
 
         public void OnApplicationQuit()
