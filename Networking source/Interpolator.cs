@@ -133,7 +133,7 @@ namespace VirtualVoid.Networking
             transform.localRotation = Quaternion.SlerpUnclamped(from.rotation, to.rotation, _lerpAmount); // Interpolate with the _lerpAmount unclamped so it can extrapolate
         }
 
-        internal void NewUpdate(int _tick, Vector3 _position, Quaternion _rotation)
+        public void NewUpdate(int _tick, Vector3 _position, Quaternion _rotation)
         {
             if (_tick <= TickLogic.delayTick)
             {
@@ -156,7 +156,7 @@ namespace VirtualVoid.Networking
                 }
             }
         }
-        internal void NewUpdate(int _tick, Vector3 _position)
+        public void NewUpdate(int _tick, Vector3 _position)
         {
             if (_tick <= TickLogic.delayTick)
             {
@@ -179,7 +179,7 @@ namespace VirtualVoid.Networking
                 }
             }
         }
-        internal void NewUpdate(int _tick, Quaternion _rotation)
+        public void NewUpdate(int _tick, Quaternion _rotation)
         {
             if (_tick <= TickLogic.delayTick)
             {
@@ -211,36 +211,36 @@ namespace VirtualVoid.Networking
         }
     }
 
-    internal class TransformUpdate
+    public class TransformUpdate
     {
-        internal static TransformUpdate zero = new TransformUpdate(0, Vector3.zero, Quaternion.identity);
+        public static TransformUpdate zero = new TransformUpdate(0, Vector3.zero, Quaternion.identity);
 
-        internal long tick;
-        internal Vector3 position;
-        internal Quaternion rotation;
+        public long tick;
+        public Vector3 position;
+        public Quaternion rotation;
 
-        internal TransformUpdate(long _tick, Vector3 _position)
+        public TransformUpdate(long _tick, Vector3 _position)
         {
             tick = _tick;
             position = _position;
             rotation = Quaternion.identity;
         }
 
-        internal TransformUpdate(long _tick, Quaternion _rotation)
+        public TransformUpdate(long _tick, Quaternion _rotation)
         {
             tick = _tick;
             position = Vector3.zero;
             rotation = _rotation;
         }
 
-        internal TransformUpdate(long _tick, Vector3 _position, Quaternion _rotation)
+        public TransformUpdate(long _tick, Vector3 _position, Quaternion _rotation)
         {
             tick = _tick;
             position = _position;
             rotation = _rotation;
         }
 
-        internal TransformUpdate(long _tick, Transform _transform, bool isLocalRotation = false)
+        public TransformUpdate(long _tick, Transform _transform, bool isLocalRotation = false)
         {
             tick = _tick;
             position = _transform.position;
