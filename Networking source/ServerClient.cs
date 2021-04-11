@@ -191,7 +191,7 @@ namespace VirtualVoid.Networking.Server
                     using (Packet _newPacket = new Packet(_packetBytes))
                     {
                         _newPacket.Decrypt(NetworkManager.instance.encryptionType, NetworkManager.instance.encryptionKey);
-                        PacketID _packetId = NetworkManager.instance.packetIDType == PacketIDType.STRING ? new PacketID(_packet.ReadString()) : new PacketID(_packet.ReadShort());
+                        PacketID _packetId = NetworkManager.instance.packetIDType == PacketIDType.STRING ? new PacketID(_newPacket.ReadString()) : new PacketID(_newPacket.ReadShort());
                         client.HandleData(_packetId, _newPacket);
                     }
                 });
@@ -216,7 +216,9 @@ namespace VirtualVoid.Networking.Server
             tcp.Disconnect();
             udp.Disconnect();
 
-            server.ClientDisconnected(id);
+            ThreadManager.ExecuteOnMainThread(() => {
+                    server.ClientDisconnected(id);
+                });
         }
 
         private void HandleData(PacketID _packetId, Packet _packet)
